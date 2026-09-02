@@ -29,7 +29,6 @@ import com.redmi14c.optimizer.ui.theme.*
 import com.redmi14c.optimizer.viewmodel.OptimizerViewModel
 import com.redmi14c.optimizer.viewmodel.ShizukuStatus
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,15 +47,16 @@ fun OptimizerStringsScreen(
     var selectedString by remember { mutableStateOf<OptimizerString?>(null) }
     var applyResult by remember { mutableStateOf("") }
 
-    val categories = try {
-        listOf("All") + NonRootOptimizerStrings.getCategories()
-    } catch (e: Exception) {
-        Timber.e(e, "Error loading categories")
-        listOf("All")
+    val categories = remember {
+        try {
+            listOf("All") + NonRootOptimizerStrings.getCategories()
+        } catch (e: Exception) {
+            listOf("All")
+        }
     }
 
-    val filteredStrings = try {
-        remember(searchQuery, selectedCategory) {
+    val filteredStrings = remember(searchQuery, selectedCategory) {
+        try {
             if (searchQuery.isEmpty() && selectedCategory == "All") {
                 NonRootOptimizerStrings.ALL_STRINGS
             } else if (searchQuery.isNotEmpty()) {
@@ -64,10 +64,9 @@ fun OptimizerStringsScreen(
             } else {
                 NonRootOptimizerStrings.getByCategory(selectedCategory)
             }
+        } catch (e: Exception) {
+            emptyList()
         }
-    } catch (e: Exception) {
-        Timber.e(e, "Error filtering strings")
-        emptyList()
     }
 
     LaunchedEffect(Unit) {
@@ -77,13 +76,23 @@ fun OptimizerStringsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Optimizer Strings DB", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "Optimizer Strings DB",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 ),
                 actions = {
-                    IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Custom")
+                    IconButton(
+                        onClick = { showAddDialog = true }
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Add Custom"
+                        )
                     }
                 }
             )
@@ -94,19 +103,33 @@ fun OptimizerStringsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Cari string optimizer...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    .padding(
+                        horizontal = 16.dp,
+                        vertical = 8.dp
+                    ),
+                placeholder = {
+                    Text("Cari string optimizer...")
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null
+                    )
+                },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        IconButton(
+                            onClick = { searchQuery = "" }
+                        ) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear"
+                            )
                         }
                     }
                 },
@@ -114,31 +137,43 @@ fun OptimizerStringsScreen(
                 shape = MaterialTheme.shapes.large
             )
 
-            // Category Chips
             ScrollableCategoryChips(
                 categories = categories,
                 selectedCategory = selectedCategory,
-                onCategorySelected = { selectedCategory = it }
+                onCategorySelected = {
+                    selectedCategory = it
+                }
             )
 
-            // Results count
             Text(
                 text = "${filteredStrings.size} strings found",
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                color = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = 0.5f
+                ),
+                modifier = Modifier.padding(
+                    horizontal = 16.dp,
+                    vertical = 4.dp
+                )
             )
 
-            // Strings List
             LazyColumn(
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(filteredStrings, key = { it.id }) { string ->
+                items(
+                    filteredStrings,
+                    key = { it.id }
+                ) { string ->
                     OptimizerStringCard(
                         string = string,
                         onCopy = {
-                            val text = string.command ?: "${string.key}=${string.value}"
-                            clipboardManager.setText(AnnotatedString(text))
+                            val text =
+                                string.command
+                                    ?: "${string.key}=${string.value}"
+
+                            clipboardManager.setText(
+                                AnnotatedString(text)
+                            )
                         },
                         onApply = {
                             selectedString = string
@@ -148,40 +183,60 @@ fun OptimizerStringsScreen(
                 }
 
                 item {
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(
+                        modifier = Modifier.height(32.dp)
+                    )
                 }
             }
         }
     }
 
-    // Apply Dialog
     if (showApplyDialog && selectedString != null) {
         AlertDialog(
-            onDismissRequest = { showApplyDialog = false },
-            title = { Text("Apply String") },
+            onDismissRequest = {
+                showApplyDialog = false
+            },
+            title = {
+                Text("Apply String")
+            },
             text = {
                 Column {
                     Text("String: ${selectedString!!.name}")
                     Text("Key: ${selectedString!!.key}")
                     Text("Value: ${selectedString!!.value}")
                     Text("Type: ${selectedString!!.type}")
-                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
                     Surface(
                         shape = MaterialTheme.shapes.small,
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
-                            text = selectedString!!.command ?: "setprop ${selectedString!!.key} ${selectedString!!.value}",
+                            text = selectedString!!.command
+                                ?: "setprop ${selectedString!!.key} ${selectedString!!.value}",
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
+
                     if (applyResult.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
                         Text(
                             text = applyResult,
-                            color = if (applyResult.contains("Success")) SuccessGreen else ErrorRed,
+                            color = if (
+                                applyResult.contains("Success")
+                            ) {
+                                SuccessGreen
+                            } else {
+                                ErrorRed
+                            },
                             fontSize = 12.sp
                         )
                     }
@@ -191,12 +246,29 @@ fun OptimizerStringsScreen(
                 Button(
                     onClick = {
                         scope.launch {
-                            if (shizukuStatus == ShizukuStatus.CONNECTED) {
-                                val cmd = selectedString!!.command ?: "setprop ${selectedString!!.key} ${selectedString!!.value}"
-                                val result = ShizukuManager.executeCommand(cmd)
-                                applyResult = if (result.success) "Success!" else "Failed: ${result.error}"
+                            val currentString = selectedString
+
+                            if (
+                                shizukuStatus ==
+                                ShizukuStatus.CONNECTED &&
+                                currentString != null
+                            ) {
+                                val cmd =
+                                    currentString.command
+                                        ?: "setprop ${currentString.key} ${currentString.value}"
+
+                                val result =
+                                    ShizukuManager.executeCommand(cmd)
+
+                                applyResult =
+                                    if (result.success) {
+                                        "Success!"
+                                    } else {
+                                        "Failed: ${result.error}"
+                                    }
                             } else {
-                                applyResult = "Shizuku not connected!"
+                                applyResult =
+                                    "Shizuku not connected!"
                             }
                         }
                     }
@@ -205,10 +277,12 @@ fun OptimizerStringsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { 
-                    showApplyDialog = false
-                    applyResult = ""
-                }) {
+                TextButton(
+                    onClick = {
+                        showApplyDialog = false
+                        applyResult = ""
+                    }
+                ) {
                     Text("Close")
                 }
             }
@@ -226,17 +300,26 @@ fun ScrollableCategoryChips(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(
+                horizontal = 16.dp,
+                vertical = 8.dp
+            ),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         categories.forEach { category ->
             val selected = category == selectedCategory
+
             FilterChip(
                 selected = selected,
-                onClick = { onCategorySelected(category) },
-                label = { Text(category) },
+                onClick = {
+                    onCategorySelected(category)
+                },
+                label = {
+                    Text(category)
+                },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = BeastOrange.copy(alpha = 0.2f),
+                    selectedContainerColor =
+                        BeastOrange.copy(alpha = 0.2f),
                     selectedLabelColor = BeastOrange
                 )
             )
@@ -251,51 +334,83 @@ fun OptimizerStringCard(
     onApply: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember {
+        mutableStateOf(false)
+    }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clickable { expanded = !expanded },
+            .padding(
+                horizontal = 16.dp,
+                vertical = 6.dp
+            )
+            .clickable {
+                expanded = !expanded
+            },
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor =
+                MaterialTheme.colorScheme.surfaceVariant
+                    .copy(alpha = 0.3f)
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment =
+                    Alignment.CenterVertically,
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = string.name,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight =
+                            FontWeight.SemiBold,
                         fontSize = 15.sp
                     )
+
                     Text(
-                        text = "${string.key} = ${string.value}",
+                        text =
+                            "${string.key} = ${string.value}",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        color =
+                            MaterialTheme.colorScheme.onSurface
+                                .copy(alpha = 0.6f),
+                        fontFamily =
+                            androidx.compose.ui.text.font.FontFamily.Monospace
                     )
                 }
 
                 Row {
-                    IconButton(onClick = onCopy) {
+                    IconButton(
+                        onClick = onCopy
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy",
-                            modifier = Modifier.size(20.dp)
+                            imageVector =
+                                Icons.Default.ContentCopy,
+                            contentDescription =
+                                "Copy",
+                            modifier =
+                                Modifier.size(20.dp)
                         )
                     }
-                    IconButton(onClick = onApply) {
+
+                    IconButton(
+                        onClick = onApply
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Apply",
-                            modifier = Modifier.size(20.dp),
+                            imageVector =
+                                Icons.Default.PlayArrow,
+                            contentDescription =
+                                "Apply",
+                            modifier =
+                                Modifier.size(20.dp),
                             tint = BeastOrange
                         )
                     }
@@ -304,68 +419,104 @@ fun OptimizerStringCard(
 
             Row(
                 modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
             ) {
                 StatusChip(
                     text = string.category,
                     color = InfoBlue,
                     icon = "📁"
                 )
+
                 StatusChip(
                     text = "${string.fpsBoost} FPS",
                     color = SuccessGreen,
                     icon = "▲"
                 )
+
                 StatusChip(
                     text = "${string.batteryImpact}%",
-                    color = if (string.batteryImpact >= 0) SuccessGreen else WarningYellow,
+                    color =
+                        if (string.batteryImpact >= 0) {
+                            SuccessGreen
+                        } else {
+                            WarningYellow
+                        },
                     icon = "🔋"
                 )
+
                 StatusChip(
                     text = string.riskLevel,
-                    color = when (string.riskLevel.lowercase()) {
-                        "low" -> SuccessGreen
-                        "medium" -> WarningYellow
-                        "high" -> BeastOrange
-                        "extreme" -> ErrorRed
-                        else -> InfoBlue
-                    },
+                    color =
+                        when (
+                            string.riskLevel.lowercase()
+                        ) {
+                            "low" -> SuccessGreen
+                            "medium" -> WarningYellow
+                            "high" -> BeastOrange
+                            "extreme" -> ErrorRed
+                            else -> InfoBlue
+                        },
                     icon = "⚠"
                 )
             }
 
-            AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
+            AnimatedVisibility(
+                visible = expanded
+            ) {
+                Column(
+                    modifier =
+                        Modifier.padding(top = 12.dp)
+                ) {
                     Text(
                         text = "Description:",
-                        fontWeight = FontWeight.Medium,
+                        fontWeight =
+                            FontWeight.Medium,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color =
+                            MaterialTheme.colorScheme.onSurface
+                                .copy(alpha = 0.7f)
                     )
+
                     Text(
                         text = string.description,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        color =
+                            MaterialTheme.colorScheme.onSurface
+                                .copy(alpha = 0.6f),
+                        modifier =
+                            Modifier.padding(bottom = 8.dp)
                     )
 
                     Text(
                         text = "Command:",
-                        fontWeight = FontWeight.Medium,
+                        fontWeight =
+                            FontWeight.Medium,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color =
+                            MaterialTheme.colorScheme.onSurface
+                                .copy(alpha = 0.7f)
                     )
+
                     SelectionContainer {
                         Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.surfaceVariant
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            shape =
+                                MaterialTheme.shapes.small,
+                            color =
+                                MaterialTheme.colorScheme
+                                    .surfaceVariant
                         ) {
                             Text(
-                                text = string.command ?: "setprop ${string.key} ${string.value}",
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                text =
+                                    string.command
+                                        ?: "setprop ${string.key} ${string.value}",
+                                fontFamily =
+                                    androidx.compose.ui.text.font.FontFamily.Monospace,
                                 fontSize = 11.sp,
-                                modifier = Modifier.padding(12.dp)
+                                modifier =
+                                    Modifier.padding(12.dp)
                             )
                         }
                     }
