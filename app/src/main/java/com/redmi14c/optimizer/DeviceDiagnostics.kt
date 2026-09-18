@@ -1,6 +1,5 @@
 package com.redmi14c.optimizer
 
-import android.content.Context
 import android.os.Build
 import com.redmi14c.optimizer.shizuku.ShizukuManager
 
@@ -23,7 +22,7 @@ object DeviceDiagnostics {
         val powerInfo: String
     )
 
-    suspend fun collect(context: Context): Report {
+    suspend fun collect(): Report {
         val uid = ShizukuManager.getUid()
 
         val mode = when (uid) {
@@ -34,11 +33,14 @@ object DeviceDiagnostics {
         }
 
         val cpuInfo = runCommand(
-            "getprop ro.hardware; getprop ro.board.platform; getprop ro.product.cpu.abi"
+            "getprop ro.hardware; " +
+                "getprop ro.board.platform; " +
+                "getprop ro.product.cpu.abi"
         )
 
         val gpuInfo = runCommand(
-            "getprop ro.hardware.egl; getprop ro.opengles.version"
+            "getprop ro.hardware.egl; " +
+                "getprop ro.opengles.version"
         )
 
         val refreshRate = runCommand(
@@ -49,7 +51,8 @@ object DeviceDiagnostics {
 
         val thermalInfo = runCommand(
             "for z in /sys/class/thermal/thermal_zone*/type; do " +
-                "echo \"TYPE: \$z\"; cat \"\$z\" 2>/dev/null; " +
+                "echo TYPE:\$z; " +
+                "cat \$z 2>/dev/null; " +
                 "done"
         )
 
@@ -70,4 +73,23 @@ object DeviceDiagnostics {
             chipset = Build.HARDWARE,
             abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "Unknown",
             shizukuUid = uid,
-            shizuku
+            shizukuMode = mode,
+            cpuInfo = cpuInfo,
+            gpuInfo = gpuInfo,
+            refreshRate = refreshRate,
+            thermalInfo = thermalInfo,
+            storageInfo = storageInfo,
+            powerInfo = powerInfo
+        )
+    }
+
+    private suspend fun runCommand(command: String): String {
+        val result = ShizukuManager.executeCommand(command)
+
+        return if (result.success) {
+            result.output.ifBlank { "No output" }
+        } else {
+            "ERROR: ${result.error}"
+        }
+    }
+}
