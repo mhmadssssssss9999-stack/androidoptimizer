@@ -1,12 +1,10 @@
 package com.redmi14c.optimizer.shizuku
 
 import android.content.pm.PackageManager
-import android.os.IBinder
-import android.os.RemoteException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
-import rikka.shizuku.ShizukuBinderWrapper
+import rikka.shizuku.ShizukuRemoteProcess
 import timber.log.Timber
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -24,9 +22,10 @@ object ShizukuManager {
     }
 
     fun hasPermission(): Boolean {
-        return if (isShizukuRunning()) {
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        } else {
+        return try {
+            isShizukuRunning() &&
+                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (e: Exception) {
             false
         }
     }
@@ -36,7 +35,9 @@ object ShizukuManager {
         Shizuku.requestPermission(REQUEST_CODE)
     }
 
-    fun removePermissionListener(listener: Shizuku.OnRequestPermissionResultListener) {
+    fun removePermissionListener(
+        listener: Shizuku.OnRequestPermissionResultListener
+    ) {
         Shizuku.removeRequestPermissionResultListener(listener)
     }
 
@@ -49,69 +50,112 @@ object ShizukuManager {
     }
 
     fun isRoot(): Boolean = getUid() == 0
+
     fun isAdb(): Boolean = getUid() == 2000
 
-    suspend fun executeCommand(command: String): ShellResult = withContext(Dispatchers.IO) {
-        try {
-            if (!isShizukuRunning() || !hasPermission()) {
-                return@withContext ShellResult(
+    suspend fun executeCommand(command: String): ShellResult =
+        withContext(Dispatchers.IO) {
+            var process: ShizukuRemoteProcess? = null
+
+            try {
+                if (!isShizukuRunning()) {
+                    return@withContext ShellResult(
+                        success = false,
+                        output = "",
+                        error = "Shizuku is not running",
+                        exitCode = -1
+                    )
+                }
+
+                if (!hasPermission()) {
+                    return@withContext ShellResult(
+                        success = false,
+                        output = "",
+                        error = "Shizuku permission not granted",
+                        exitCode = -1
+                    )
+                }
+
+                process = Shizuku.newProcess(
+                    arrayOf("sh", "-c", command),
+                    null,
+                    null
+                )
+
+                val output = StringBuilder()
+                val error = StringBuilder()
+
+                val outputReader = BufferedReader(
+                    InputStreamReader(process.inputStream)
+                )
+
+                val errorReader = BufferedReader(
+                    InputStreamReader(process.errorStream)
+                )
+
+                outputReader.useLines { lines ->
+                    lines.forEach { line ->
+                        output.append(line).append('\n')
+                    }
+                }
+
+                errorReader.useLines { lines ->
+                    lines.forEach { line ->
+                        error.append(line).append('\n')
+                    }
+                }
+
+                val exitCode = process.waitFor()
+
+                ShellResult(
+                    success = exitCode == 0,
+                    output = output.toString().trim(),
+                    error = error.toString().trim(),
+                    exitCode = exitCode
+                )
+
+            } catch (e: Exception) {
+                Timber.e(e, "Shizuku command failed: $command")
+
+                ShellResult(
                     success = false,
                     output = "",
-                    error = "Shizuku not running or no permission"
+                    error = e.message ?: "Unknown Shizuku error",
+                    exitCode = -1
                 )
+            } finally {
+                try {
+                    process?.destroy()
+                } catch (_: Exception) {
+                }
             }
-
-            // Use Runtime.exec as fallback since Shizuku.newProcess is deprecated/private
-            val process = Runtime.getRuntime().exec(
-                arrayOf("sh", "-c", command)
-            )
-
-            val output = StringBuilder()
-            val error = StringBuilder()
-
-            val outputReader = BufferedReader(InputStreamReader(process.inputStream))
-            val errorReader = BufferedReader(InputStreamReader(process.errorStream))
-
-            var line: String?
-            while (outputReader.readLine().also { line = it } != null) {
-                output.append(line).append("\n")
-            }
-
-            while (errorReader.readLine().also { line = it } != null) {
-                error.append(line).append("\n")
-            }
-
-            val exitCode = process.waitFor()
-
-            ShellResult(
-                success = exitCode == 0,
-                output = output.toString().trim(),
-                error = error.toString().trim(),
-                exitCode = exitCode
-            )
-        } catch (e: Exception) {
-            Timber.e(e, "Error executing command: $command")
-            ShellResult(
-                success = false,
-                output = "",
-                error = e.message ?: "Unknown error",
-                exitCode = -1
-            )
         }
-    }
 
-    suspend fun executeCommands(commands: List<String>): List<ShellResult> {
+    suspend fun executeCommands(
+        commands: List<String>
+    ): List<ShellResult> {
         return commands.map { executeCommand(it) }
     }
 
-    suspend fun executeCommandWithOutput(command: String): String {
+    suspend fun executeCommandWithOutput(
+        command: String
+    ): String {
         val result = executeCommand(command)
-        return if (result.success) result.output else result.error
+
+        return if (result.success) {
+            result.output
+        } else {
+            result.error
+        }
     }
 
     fun getShizukuVersion(): String {
         return try {
-            Shizuku.getBinder()?.let { "v${Shizuku.getVersion()}" } ?: "Not installed"
+            if (!isShizukuRunning()) {
+                "Not running"
+            } else {
+                "v${Shizuku.getVersion()}"
+            }
         } catch (e: Exception) {
             "Unknown"
         }
